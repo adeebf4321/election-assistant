@@ -17,7 +17,13 @@ export default function Assistant() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fix hydration mismatch — only render interactive elements after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,7 +41,7 @@ export default function Assistant() {
     setInput("");
     
     // Add user message immediately
-    const newMessages = [...messages, { role: "user" as const, content: userMessage }];
+    const newMessages: Message[] = [...messages, { role: "user", content: userMessage }];
     setMessages(newMessages);
     setIsLoading(true);
 
@@ -47,22 +53,24 @@ export default function Assistant() {
         },
         body: JSON.stringify({
           message: userMessage,
-          history: messages.slice(1) // Send history excluding the system prompt wrapper
+          history: messages.slice(1) // Send history excluding the initial greeting
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to fetch response");
-
       const data = await response.json();
-      
-      setMessages([...newMessages, { role: "assistant", content: data.reply }]);
+
+      if (data.reply) {
+        setMessages([...newMessages, { role: "assistant", content: data.reply }]);
+      } else {
+        throw new Error(data.error || "No reply received");
+      }
     } catch (error) {
       console.error("Chat error:", error);
       setMessages([
         ...newMessages,
         { 
           role: "assistant", 
-          content: "I apologize, but I am having trouble connecting to my knowledge base right now. Please try again later." 
+          content: "I encountered a network issue. Please check your internet connection and try again." 
         }
       ]);
     } finally {
@@ -146,25 +154,36 @@ export default function Assistant() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
+          {/* Input Area — only render interactive form after hydration */}
           <div className="p-4 bg-[#112240] border-t border-white/10">
-            <form onSubmit={handleSubmit} className="flex gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about Form 6, polling dates, eligibility..."
-                className="flex-1 bg-[#0A192F] border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#FF9933] focus:ring-1 focus:ring-[#FF9933] transition-all"
-                disabled={isLoading}
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || isLoading}
-                className="bg-[#FF9933] hover:bg-[#e68a2e] disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-colors flex items-center justify-center"
-              >
-                <Send className="h-5 w-5" />
-              </button>
-            </form>
+            {mounted ? (
+              <form onSubmit={handleSubmit} className="flex gap-2">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask about Form 6, polling dates, eligibility..."
+                  className="flex-1 bg-[#0A192F] border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#FF9933] focus:ring-1 focus:ring-[#FF9933] transition-all"
+                  disabled={isLoading}
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isLoading}
+                  className="bg-[#FF9933] hover:bg-[#e68a2e] disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-colors flex items-center justify-center"
+                >
+                  <Send className="h-5 w-5" />
+                </button>
+              </form>
+            ) : (
+              <div className="flex gap-2">
+                <div className="flex-1 bg-[#0A192F] border border-white/20 rounded-xl px-4 py-3 text-gray-500">
+                  Ask about Form 6, polling dates, eligibility...
+                </div>
+                <div className="bg-[#FF9933] opacity-50 text-white p-3 rounded-xl flex items-center justify-center">
+                  <Send className="h-5 w-5" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
