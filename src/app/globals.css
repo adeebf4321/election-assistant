@@ -14,6 +14,11 @@
   --foreground: var(--pure-white);
 }
 
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem; /* Height of the sticky navbar */
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
