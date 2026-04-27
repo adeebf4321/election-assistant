@@ -28,8 +28,13 @@ let analytics: Analytics | null = null;
 /**
  * Returns the initialized Firebase App instance.
  * Uses a singleton pattern to prevent multiple initializations.
+ * Returns null if the configuration is incomplete.
  */
-export function getFirebaseApp(): FirebaseApp {
+export function getFirebaseApp(): FirebaseApp | null {
+  if (!firebaseConfig.apiKey) {
+    return null;
+  }
+
   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
   } else {
@@ -51,6 +56,7 @@ export async function getFirebaseAnalytics(): Promise<Analytics | null> {
 
   if (!analytics) {
     const firebaseApp = getFirebaseApp();
+    if (!firebaseApp) return null;
     analytics = getAnalytics(firebaseApp);
   }
   return analytics;
