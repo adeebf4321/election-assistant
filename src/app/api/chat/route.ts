@@ -1,5 +1,25 @@
+/**
+ * Chat API Route Handler.
+ *
+ * Processes user messages by forwarding them to the Google Gemini API.
+ * Includes automatic retry logic for rate limits (429) and server errors (503),
+ * and falls back to a comprehensive offline knowledge base when the API
+ * is unavailable or the free-tier quota is exhausted.
+ */
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+
+/** Represents a single message in the chat history */
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** Represents a formatted history entry for the Gemini API */
+interface GeminiHistoryEntry {
+  role: "user" | "model";
+  parts: { text: string }[];
+}
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -159,7 +179,7 @@ function getOfflineResponse(message: string): string {
  */
 async function callGeminiWithRetry(
   message: string,
-  formattedHistory: any[],
+  formattedHistory: GeminiHistoryEntry[],
   retries = 2
 ): Promise<string> {
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -183,8 +203,8 @@ async function callGeminiWithRetry(
       const result = await chat.sendMessage(message);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      const status = error?.status;
+    } catch (error: unknown) {
+      const status = (error as Record<string, unknown>)?.status as number | undefined;
       console.warn(`Gemini attempt ${attempt + 1} failed (status: ${status})`);
 
       // If rate limited or server error, wait and retry
@@ -202,13 +222,14 @@ async function callGeminiWithRetry(
   return getOfflineResponse(message);
 }
 
+/** Handles incoming POST requests to the /api/chat endpoint */
 export async function POST(req: Request) {
   try {
-    const { message, history } = await req.json();
+    const { message, history } = await req.json() as { message: string; history: ChatMessage[] };
 
     // Format history for Gemini
-    const formattedHistory = (history || []).map((msg: any) => ({
-      role: msg.role === "user" ? "user" : "model",
+    const formattedHistory: GeminiHistoryEntry[] = (history || []).map((msg: ChatMessage) => ({
+      role: msg.role === "user" ? "user" as const : "model" as const,
       parts: [{ text: msg.content }],
     }));
 
