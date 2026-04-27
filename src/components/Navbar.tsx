@@ -18,7 +18,7 @@ export default function Navbar() {
 
   return (
     <nav
-      className="glass-panel sticky top-0 z-50 w-full border-b border-white/10"
+      className="bg-[#0A192F] sticky top-0 z-50 w-full border-b border-white/10"
       aria-label="Main navigation"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -87,7 +87,7 @@ export default function Navbar() {
       {isOpen && (
         <div
           id="mobile-menu"
-          className="md:hidden glass-panel border-t border-white/10"
+          className="md:hidden bg-[#0A192F] border-t border-white/10"
           role="navigation"
           aria-label="Mobile menu"
         >
