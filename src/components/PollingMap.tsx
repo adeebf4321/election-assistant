@@ -11,7 +11,7 @@
 import { MapPin, ExternalLink } from "lucide-react";
 
 export default function PollingMap() {
-  const googleMapsEmbedUrl = `https://www.google.com/maps/embed/v1/search?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8"}&q=Election+Commission+Office+India&zoom=5&center=20.5937,78.9629`;
+  const googleMapsEmbedUrl = `https://www.google.com/maps/embed/v1/search?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || ""}&q=Election+Commission+Office+India&zoom=5&center=20.5937,78.9629`;
 
   return (
     <section
