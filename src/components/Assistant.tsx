@@ -16,6 +16,7 @@ import { Send, Bot, User, Loader2, Mail, Check, AlertCircle } from "lucide-react
 import { useAuth } from "@/lib/auth-context";
 import { saveChatHistory, loadChatHistory } from "@/lib/firestore";
 import { sendChatHistoryEmail } from "@/lib/google-apis";
+import { sendMessage } from "@/lib/gemini-client";
 
 /** Represents a single chat message */
 interface Message {
@@ -139,27 +140,13 @@ export default function Assistant() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userMessage,
-          history: messages.slice(1),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.reply) {
-        const updatedMessages: Message[] = [
-          ...newMessages,
-          { role: "assistant", content: data.reply },
-        ];
-        setMessages(updatedMessages);
-        persistMessages(updatedMessages);
-      } else {
-        throw new Error(data.error || "No reply received");
-      }
+      const reply = await sendMessage(userMessage, messages.slice(1));
+      const updatedMessages: Message[] = [
+        ...newMessages,
+        { role: "assistant", content: reply },
+      ];
+      setMessages(updatedMessages);
+      persistMessages(updatedMessages);
     } catch (error) {
       console.error("Chat error:", error);
       const errorMessages: Message[] = [

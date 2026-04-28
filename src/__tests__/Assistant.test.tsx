@@ -31,6 +31,11 @@ jest.mock("@/lib/google-apis", () => ({
   sendChatHistoryEmail: jest.fn(),
 }));
 
+// Mock the gemini-client module
+jest.mock("@/lib/gemini-client", () => ({
+  sendMessage: jest.fn().mockResolvedValue("Test reply"),
+}));
+
 describe("Assistant", () => {
   it("renders the section heading", () => {
     render(<Assistant />);
