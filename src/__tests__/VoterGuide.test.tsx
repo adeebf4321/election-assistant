@@ -17,6 +17,23 @@ jest.mock("framer-motion", () => ({
   },
 }));
 
+// Mock the auth context
+jest.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    accessToken: null,
+    signInWithGoogle: jest.fn(),
+    signOut: jest.fn(),
+  }),
+}));
+
+// Mock the google-apis module
+jest.mock("@/lib/google-apis", () => ({
+  saveToGoogleDrive: jest.fn(),
+  generateVoterGuideContent: jest.fn().mockReturnValue("test content"),
+}));
+
 describe("VoterGuide", () => {
   it("renders the heading", () => {
     render(<VoterGuide />);

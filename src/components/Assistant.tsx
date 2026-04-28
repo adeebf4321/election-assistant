@@ -6,11 +6,16 @@
  * election process and receive detailed, non-partisan answers.
  * Implements full accessibility with ARIA live regions for dynamic
  * message updates, keyboard navigation, and focus management.
+ * When signed in, chat history is persisted to Cloud Firestore
+ * and can be emailed via the Gmail API.
  */
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Send, Bot, User, Loader2, Mail, Check, AlertCircle } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { saveChatHistory, loadChatHistory } from "@/lib/firestore";
+import { sendChatHistoryEmail } from "@/lib/google-apis";
 
 /** Represents a single chat message */
 interface Message {
@@ -20,6 +25,13 @@ interface Message {
   content: string;
 }
 
+/** The default welcome message shown when starting a new chat */
+const WELCOME_MESSAGE: Message = {
+  role: "assistant",
+  content:
+    "Namaste! I am your Election Process Assistant. I can help you understand voter registration, Form 6, polling rules, and the general election timeline in India. How can I assist you today?",
+};
+
 /**
  * Formats message content by converting markdown-style bold
  * syntax (**text**) into HTML <strong> tags.
@@ -28,22 +40,76 @@ function formatMessageContent(content: string): string {
   return content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 }
 
+/** Converts messages array into plain text for email */
+function formatChatForEmail(messages: Message[]): string {
+  return messages
+    .map((msg) => {
+      const sender = msg.role === "user" ? "You" : "Election AI Assistant";
+      const content = msg.content.replace(/\*\*(.*?)\*\*/g, "$1");
+      return `[${sender}]\n${content}`;
+    })
+    .join("\n\n");
+}
+
 export default function Assistant() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content:
-        "Namaste! I am your Election Process Assistant. I can help you understand voter registration, Form 6, polling rules, and the general election timeline in India. How can I assist you today?",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user, accessToken } = useAuth();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  /** Load chat history from Firestore when user signs in */
+  useEffect(() => {
+    if (!user?.uid) {
+      setHistoryLoaded(false);
+      return;
+    }
+
+    let cancelled = false;
+    loadChatHistory(user.uid).then((saved) => {
+      if (cancelled) return;
+      if (saved.length > 0) {
+        setMessages(saved);
+      }
+      setHistoryLoaded(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
+  /** Save chat history to Firestore whenever messages change */
+  const persistMessages = useCallback(
+    (msgs: Message[]) => {
+      if (user?.uid && historyLoaded && msgs.length > 1) {
+        saveChatHistory(user.uid, msgs);
+      }
+    },
+    [user?.uid, historyLoaded]
+  );
+
+  /** Sends the chat history to the user's email via Gmail API */
+  const handleEmailChat = useCallback(async () => {
+    if (!accessToken || !user?.email) return;
+    setEmailStatus("sending");
+    try {
+      const chatText = formatChatForEmail(messages);
+      const success = await sendChatHistoryEmail(accessToken, user.email, chatText);
+      setEmailStatus(success ? "sent" : "error");
+    } catch {
+      setEmailStatus("error");
+    }
+    // Reset status after 3 seconds
+    setTimeout(() => setEmailStatus("idle"), 3000);
+  }, [accessToken, user?.email, messages]);
 
   /** Scrolls the chat window to the latest message */
   const scrollToBottom = () => {
@@ -85,23 +151,27 @@ export default function Assistant() {
       const data = await response.json();
 
       if (data.reply) {
-        setMessages([
+        const updatedMessages: Message[] = [
           ...newMessages,
           { role: "assistant", content: data.reply },
-        ]);
+        ];
+        setMessages(updatedMessages);
+        persistMessages(updatedMessages);
       } else {
         throw new Error(data.error || "No reply received");
       }
     } catch (error) {
       console.error("Chat error:", error);
-      setMessages([
+      const errorMessages: Message[] = [
         ...newMessages,
         {
           role: "assistant",
           content:
             "I encountered a network issue. Please check your internet connection and try again.",
         },
-      ]);
+      ];
+      setMessages(errorMessages);
+      persistMessages(errorMessages);
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +220,7 @@ export default function Assistant() {
             >
               <Bot className="h-6 w-6 text-[#138808]" />
             </div>
-            <div>
+            <div className="flex-1">
               <h3 className="text-white font-bold">Election AI Assistant</h3>
               <p className="text-xs text-[#138808] flex items-center gap-1">
                 <span
@@ -160,6 +230,57 @@ export default function Assistant() {
                 <span>Online</span>
               </p>
             </div>
+            {/* Email Chat Button — visible when signed in */}
+            {user && accessToken && messages.length > 1 && (
+              <button
+                onClick={handleEmailChat}
+                disabled={emailStatus === "sending"}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9933] disabled:opacity-50"
+                style={{
+                  borderColor:
+                    emailStatus === "sent"
+                      ? "#138808"
+                      : emailStatus === "error"
+                      ? "#ef4444"
+                      : "rgba(255,255,255,0.2)",
+                  color:
+                    emailStatus === "sent"
+                      ? "#138808"
+                      : emailStatus === "error"
+                      ? "#ef4444"
+                      : "#9ca3af",
+                }}
+                aria-label="Email chat history to yourself"
+              >
+                {emailStatus === "sending" && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                )}
+                {emailStatus === "sent" && (
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                {emailStatus === "error" && (
+                  <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                {emailStatus === "idle" && (
+                  <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                <span>
+                  {emailStatus === "sending"
+                    ? "Sending..."
+                    : emailStatus === "sent"
+                    ? "Sent!"
+                    : emailStatus === "error"
+                    ? "Failed"
+                    : "Email Chat"}
+                </span>
+              </button>
+            )}
+            {user && !accessToken && (
+              <div className="text-xs text-gray-400 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#FF9933]" aria-hidden="true" />
+                Chat synced
+              </div>
+            )}
           </div>
 
           {/* Messages Area */}

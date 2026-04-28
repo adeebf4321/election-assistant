@@ -23,6 +23,19 @@ jest.mock("next/link", () => {
   };
 });
 
+// Mock the auth context
+const mockSignIn = jest.fn();
+const mockSignOut = jest.fn();
+jest.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    accessToken: null,
+    signInWithGoogle: mockSignIn,
+    signOut: mockSignOut,
+  }),
+}));
+
 describe("Navbar", () => {
   it("renders the brand name IndiaVotes", () => {
     render(<Navbar />);
@@ -71,5 +84,13 @@ describe("Navbar", () => {
       name: /Mobile menu/i,
     });
     expect(mobileMenu).toBeInTheDocument();
+  });
+
+  it("renders a Sign In button when user is not authenticated", () => {
+    render(<Navbar />);
+    const signInBtn = screen.getByRole("button", {
+      name: /Sign in with Google/i,
+    });
+    expect(signInBtn).toBeInTheDocument();
   });
 });

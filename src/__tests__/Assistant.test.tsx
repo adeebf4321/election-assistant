@@ -9,6 +9,28 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = jest.fn();
 });
 
+// Mock the auth context
+jest.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    accessToken: null,
+    signInWithGoogle: jest.fn(),
+    signOut: jest.fn(),
+  }),
+}));
+
+// Mock the firestore module
+jest.mock("@/lib/firestore", () => ({
+  saveChatHistory: jest.fn(),
+  loadChatHistory: jest.fn().mockResolvedValue([]),
+}));
+
+// Mock the google-apis module
+jest.mock("@/lib/google-apis", () => ({
+  sendChatHistoryEmail: jest.fn(),
+}));
+
 describe("Assistant", () => {
   it("renders the section heading", () => {
     render(<Assistant />);

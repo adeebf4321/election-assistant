@@ -1,12 +1,15 @@
 /**
  * Firebase configuration and initialization module.
  *
- * Initializes Firebase App and Firebase Analytics for tracking
- * user engagement and usage patterns across the application.
+ * Initializes Firebase App, Firebase Analytics, Firebase Authentication,
+ * and Cloud Firestore for tracking user engagement, authenticating users,
+ * and persisting data across sessions.
  * Analytics is only initialized in the browser environment.
  */
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
+import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 /** Firebase project configuration sourced from environment variables */
 const firebaseConfig = {
@@ -24,6 +27,12 @@ let app: FirebaseApp;
 
 /** Singleton Firebase Analytics instance */
 let analytics: Analytics | null = null;
+
+/** Singleton Firebase Auth instance */
+let auth: Auth | null = null;
+
+/** Singleton Firestore instance */
+let db: Firestore | null = null;
 
 /**
  * Returns the initialized Firebase App instance.
@@ -60,4 +69,36 @@ export async function getFirebaseAnalytics(): Promise<Analytics | null> {
     analytics = getAnalytics(firebaseApp);
   }
   return analytics;
+}
+
+/**
+ * Returns the Firebase Auth instance.
+ * Uses a singleton pattern to prevent multiple initializations.
+ * Returns null if the Firebase app cannot be initialized.
+ */
+export function getFirebaseAuth(): Auth | null {
+  if (typeof window === "undefined") return null;
+
+  if (!auth) {
+    const firebaseApp = getFirebaseApp();
+    if (!firebaseApp) return null;
+    auth = getAuth(firebaseApp);
+  }
+  return auth;
+}
+
+/**
+ * Returns the Cloud Firestore instance.
+ * Uses a singleton pattern to prevent multiple initializations.
+ * Returns null if the Firebase app cannot be initialized.
+ */
+export function getFirebaseFirestore(): Firestore | null {
+  if (typeof window === "undefined") return null;
+
+  if (!db) {
+    const firebaseApp = getFirebaseApp();
+    if (!firebaseApp) return null;
+    db = getFirestore(firebaseApp);
+  }
+  return db;
 }
